@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>고슐랭</title>
+<style>
+:root{--bg:#f7f2ea;--card:#fffdf9;--ink:#2b2420;--sub:#7a6d63;--line:#e6dccf;--accent:#8b2635;--accent-soft:#f3e3e3;--chip:#efe6da}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1916;--card:#27221e;--ink:#efe7dd;--sub:#a99c90;--line:#3a332d;--accent:#e07a85;--accent-soft:#3a2427;--chip:#332c26}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;line-height:1.55}
+header{padding:28px 16px 12px;max-width:960px;margin:0 auto}
+h1{margin:0;font-size:30px;letter-spacing:-.5px}
+h1 span{color:var(--accent)}
+.lead{color:var(--sub);margin:4px 0 0;font-size:14px}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px}
+.stat b{color:var(--accent)}
+.filters{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.filters-in{max-width:960px;margin:0 auto;padding:10px 16px;display:grid;gap:8px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row label{font-size:12px;color:var(--sub);min-width:34px}
+input[type=search],select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+input[type=search]{flex:1;min-width:0}
+.chip{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:960px;margin:0 auto;padding:14px 16px 60px;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.name{font-size:17px;font-weight:700;margin:0}
+.loc{font-size:12px;color:var(--sub)}
+.badge{font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid var(--line);color:var(--sub)}
+.badge.선정{background:var(--accent);border-color:var(--accent);color:#fff}
+.grade{font-size:13px;color:var(--accent);font-weight:600}
+.age{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--ink);color:var(--card);margin-left:4px}
+.grade.sug{color:var(--sub);font-weight:400}
+.meta{font-size:13px;color:var(--sub)}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{font-size:12px;background:var(--accent-soft);border-radius:6px;padding:1px 7px}
+.note{font-size:14px}
+.note p{margin:0}
+details{font-size:13px;border-top:1px dashed var(--line);padding-top:6px}
+summary{cursor:pointer;color:var(--sub)}
+details p,details ul{margin:4px 0}
+details ul{padding-left:18px}
+dl{display:grid;grid-template-columns:72px 1fr;gap:2px 8px;margin:6px 0}
+dt{color:var(--sub)}dd{margin:0}
+.unk{color:#b07a2a}
+a{color:var(--accent)}
+.empty{grid-column:1/-1;text-align:center;color:var(--sub);padding:40px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>고</span>슐랭</h1>
+  <p class="lead">고민수가 직접 먹어보고 고른 맛집 · 1 근처면 가볼 만하다 · 2 이거 먹으러 가볼 만하다 · 3 맛집 중의 맛집</p>
+  <div class="stats" id="stats"></div>
+</header>
+<div class="filters"><div class="filters-in">
+  <div class="row"><input type="search" id="q" placeholder="상호·메뉴·동네 검색"><select id="status"></select><select id="grade"></select></div>
+  <div class="row" id="sido"><label>지역</label></div>
+  <div class="row" id="tagrow"><label>태그</label></div>
+</div></div>
+<main id="list"></main>
+<script>
+const DATA={{DATA}}, TAGS={{TAGS}}, STATUS={{STATUS}}, GRADES={{GRADES}};
+const st={q:"",status:"",grade:"",sido:new Set(),tags:new Set()};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const unk=v=>!v||v==="확인 필요"?'<span class="unk">확인 필요</span>':esc(v);
+
+function initFilters(){
+  const s=$("#status");s.innerHTML='<option value="">모든 상태</option>'+STATUS.map(x=>`<option>${x}</option>`).join("");
+  const g=$("#grade");g.innerHTML='<option value="">모든 등급</option>'+Object.keys(GRADES).map(k=>`<option value="${k}">${k} · ${GRADES[k]}</option>`).join("")+'<option value="none">등급 미정</option>';
+  const sidos=[...new Set(DATA.map(d=>d.sido||"확인 필요"))].sort();
+  for(const x of sidos){const b=document.createElement("button");b.className="chip";b.textContent=x;b.onclick=()=>{st.sido.has(x)?st.sido.delete(x):st.sido.add(x);b.classList.toggle("on");render()};$("#sido").append(b)}
+  for(const [k,e] of Object.entries(TAGS)){const b=document.createElement("button");b.className="chip";b.textContent=e+" "+k;b.onclick=()=>{st.tags.has(k)?st.tags.delete(k):st.tags.add(k);b.classList.toggle("on");render()};$("#tagrow").append(b)}
+  $("#q").oninput=e=>{st.q=e.target.value.trim();render()};
+  s.onchange=e=>{st.status=e.target.value;render()};
+  g.onchange=e=>{st.grade=e.target.value;render()};
+}
+function match(d){
+  if(st.status&&d.status!==st.status)return false;
+  if(st.grade==="none"&&d.grade)return false;
+  if(st.grade&&st.grade!=="none"&&d.grade!==st.grade)return false;
+  if(st.sido.size&&!st.sido.has(d.sido||"확인 필요"))return false;
+  for(const t of st.tags)if(!d.tags.includes(t))return false;
+  if(st.q){const h=[d.name,d.menu,d.dong,d.sgg,d.sido,d.genre,d.addr].join(" ");if(!h.includes(st.q))return false}
+  return true;
+}
+function card(d){
+  const loc=[d.sido,d.sgg!=="확인 필요"?d.sgg:"",d.dong].filter(Boolean).join(" ");
+  const grade=d.grade?`<div class="grade">${"★".repeat(+d.grade)} ${GRADES[d.grade]}</div>`:(d.status==="선정"?`<div class="grade sug">등급 미정${d.gradeSug?" (제안 "+esc(d.gradeSug)+")":""}</div>`:"");
+  const tags=d.tags.map(t=>`<span class="tag">${TAGS[t]||""} ${esc(t)}${t==="분위기"&&d.mood?" · "+esc(d.mood):""}</span>`).join("");
+  return `<article class="card">
+  <div class="top"><div><h2 class="name">${esc(d.name)}${d.age?`<span class="age">업력 ${esc(d.age)}</span>`:""}</h2><div class="loc">${esc(loc)}</div></div><span class="badge ${esc(d.status)}">${esc(d.status)}</span></div>
+  ${grade}
+  <div class="meta">${esc(d.genre)}${d.menu?" · "+esc(d.menu):""}</div>
+  ${tags?`<div class="tags">${tags}</div>`:""}
+  ${d.note?`<div class="note">${d.note}</div>`:""}
+  <details><summary>상세 정보</summary>
+   <dl><dt>주소</dt><dd>${unk(d.addr)}</dd><dt>개업연도</dt><dd>${unk(d.year)}</dd>
+   ${d.plus?`<dt>가점</dt><dd>${esc(d.plus)}</dd>`:""}${d.minus?`<dt>감점</dt><dd>${esc(d.minus)}</dd>`:""}
+   <dt>진입근거</dt><dd>${esc(d.basis)||"-"}</dd><dt>출처 수</dt><dd>${esc(d.src)}</dd><dt>최종확인</dt><dd>${esc(d.checked)||"-"}</dd></dl>
+   ${d.memo?"<b>조사 메모</b>"+d.memo:""}${d.sources?"<b>출처</b>"+d.sources:""}
+  </details></article>`;
+}
+function render(){
+  const list=DATA.filter(match).sort((a,b)=>(+b.grade||0)-(+a.grade||0)||a.sido.localeCompare(b.sido)||a.name.localeCompare(b.name));
+  $("#list").innerHTML=list.length?list.map(card).join(""):'<p class="empty">조건에 맞는 식당이 없습니다.</p>';
+  const c=s=>DATA.filter(d=>d.status===s).length;
+  $("#stats").innerHTML=`<span class="stat">전체 <b>${DATA.length}</b></span><span class="stat">선정 <b>${c("선정")}</b></span><span class="stat">후보 <b>${c("후보")}</b></span><span class="stat">답사 예정 <b>${c("답사 예정")}</b></span><span class="stat">표시 중 <b>${list.length}</b></span>`;
+}
+initFilters();render();
+</script>
+</body>
+</html>
