@@ -1,7 +1,7 @@
 """고슐랭 빌드: data/ 안의 식당 파일을 읽어 검증하고 index.html을 만든다.
 실행: python3 build.py   (외부 패키지 필요 없음)
 """
-import datetime, html, json, re, sys
+import csv, datetime, html, json, re, sys
 from collections import Counter
 from pathlib import Path
 
@@ -145,6 +145,14 @@ def main():
                .replace("{{GRADES}}", json.dumps(GRADE_LABEL, ensure_ascii=False)))
     (ROOT / "index.html").write_text(page, encoding="utf-8")
 
+    # 지도용 CSV (구글 내 지도 가져오기용): 주소가 확인된 곳만, 탈락·폐업 확인 제외
+    rows = sorted((r["name"], r["addr"]) for r in records
+                  if r["addr"] and r["addr"] != "확인 필요" and r["status"] not in ("탈락", "폐업 확인"))
+    with open(ROOT / "map.csv", "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["상호", "주소"])
+        w.writerows(rows)
+
     c = Counter(r["status"] for r in records)
     print(f"식당 {len(records)}곳 | " + " · ".join(f"{s} {c[s]}" for s in STATUS if c[s]))
     for w in warns:
@@ -154,7 +162,7 @@ def main():
             print("오류:", e)
         print(f"검증 실패: 오류 {len(errors)}건")
         sys.exit(1)
-    print("검증 통과: 오류 0건 → index.html 생성 완료")
+    print(f"검증 통과: 오류 0건 → index.html · map.csv({len(rows)}곳) 생성 완료")
 
 
 if __name__ == "__main__":
